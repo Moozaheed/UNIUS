@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UNIUS — US CS PhD Faculty Directory</title>
+<meta name="description" content="Search 900+ CS / SE / IS PhD faculty across 200+ US universities by research area and funding signal." />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e4e2dd;
+    --text: #1d1b16;
+    --text-dim: #6b6862;
+    --accent: #8a3b2e;
+    --accent-weak: #f1e4e0;
+    --tag-bg: #eef0ec;
+    --tag-text: #40463c;
+    --badge-active: #2f6b3a;
+    --badge-active-bg: #e4f0e3;
+    --badge-recruiting: #8a3b2e;
+    --badge-recruiting-bg: #f6e8e4;
+    --badge-unclear: #6b6862;
+    --badge-unclear-bg: #eeece8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614;
+      --surface: #1f1e1b;
+      --border: #332f29;
+      --text: #ece8e0;
+      --text-dim: #a19b90;
+      --accent: #e08a6f;
+      --accent-weak: #3a2420;
+      --tag-bg: #2a2924;
+      --tag-text: #cfccc4;
+      --badge-active: #8fd19e;
+      --badge-active-bg: #203323;
+      --badge-recruiting: #e08a6f;
+      --badge-recruiting-bg: #3a2420;
+      --badge-unclear: #a19b90;
+      --badge-unclear-bg: #2a2924;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614;
+    --surface: #1f1e1b;
+    --border: #332f29;
+    --text: #ece8e0;
+    --text-dim: #a19b90;
+    --accent: #e08a6f;
+    --accent-weak: #3a2420;
+    --tag-bg: #2a2924;
+    --tag-text: #cfccc4;
+    --badge-active: #8fd19e;
+    --badge-active-bg: #203323;
+    --badge-recruiting: #e08a6f;
+    --badge-recruiting-bg: #3a2420;
+    --badge-unclear: #a19b90;
+    --badge-unclear-bg: #2a2924;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  }
+  header {
+    padding: 2.2rem 1.5rem 1.4rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header h1 {
+    margin: 0 0 0.3rem;
+    font-size: 2rem;
+    letter-spacing: 0.01em;
+  }
+  header p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    max-width: 640px;
+  }
+  .controls {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 5;
+    padding-top: 0.5rem;
+  }
+  input[type="text"], select {
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+  }
+  input[type="text"] { flex: 1 1 260px; min-width: 200px; }
+  select { flex: 0 0 auto; }
+  .tab {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    padding: 0.55rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.9rem;
+  }
+  .tab.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-weak);
+  }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0.5rem 1.5rem 3rem;
+  }
+  #status {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin: 0.4rem 0 1rem;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.9rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  .card .star {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.7rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: var(--border);
+    background: none;
+    border: none;
+    line-height: 1;
+    padding: 0.1rem;
+  }
+  .card .star.on { color: #d9a441; }
+  .card h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    padding-right: 1.5rem;
+  }
+  .card .uni {
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .card .dept {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+  }
+  .card .title {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    width: fit-content;
+    font-weight: 600;
+  }
+  .badge.active, .badge.grant-active { color: var(--badge-active); background: var(--badge-active-bg); }
+  .badge.recruiting { color: var(--badge-recruiting); background: var(--badge-recruiting-bg); }
+  .badge.unclear { color: var(--badge-unclear); background: var(--badge-unclear-bg); }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  .tag {
+    font-size: 0.72rem;
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+  }
+  .links {
+    display: flex;
+    gap: 0.7rem;
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+  }
+  .links a { color: var(--accent); text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  footer {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem 3rem;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+  }
+  #empty {
+    display: none;
+    color: var(--text-dim);
+    padding: 3rem 1rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>UNIUS</h1>
+  <p>A directory of CS / Software Engineering / Information Science PhD faculty across 200+ US universities — search by research area, filter by funding signal, and build your own shortlist of potential advisors.</p>
+</header>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Search name, university, department, research area…" />
+  <select id="fundingFilter">
+    <option value="">Any funding signal</option>
+    <option value="grant-active">Grant active</option>
+    <option value="recruiting">Recruiting</option>
+    <option value="unclear">Unclear</option>
+  </select>
+  <select id="uniFilter">
+    <option value="">All universities</option>
+  </select>
+  <button class="tab active" id="tabAll" type="button">All faculty</button>
+  <button class="tab" id="tabShortlist" type="button">My shortlist (<span id="shortlistCount">0</span>)</button>
+</div>
+
+<main>
+  <div id="status">Loading faculty…</div>
+  <div id="grid"></div>
+  <div id="empty">No faculty match your filters.</div>
+</main>
+
+<footer>
+  Data collected from public university and lab directory pages for research/educational use. Shortlist is stored only in your browser (localStorage) — nothing is sent anywhere.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+  const SUPABASE_URL = "https://mdgasifbbuwizvqsomwg.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_aCkejAGWx0MWyuCI382Ihg_-sVtEXE1";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const SHORTLIST_KEY = "unius_shortlist_v1";
+  const getShortlist = () => {
+    try { return new Set(JSON.parse(localStorage.getItem(SHORTLIST_KEY) || "[]")); }
+    catch { return new Set(); }
+  };
+  const saveShortlist = (set) => {
+    try { localStorage.setItem(SHORTLIST_KEY, JSON.stringify([...set])); } catch {}
+  };
+  let shortlist = getShortlist();
+
+  let allFaculty = [];
+  let view = "all";
+
+  const grid = document.getElementById("grid");
+  const statusEl = document.getElementById("status");
+  const emptyEl = document.getElementById("empty");
+  const searchEl = document.getElementById("search");
+  const fundingEl = document.getElementById("fundingFilter");
+  const uniEl = document.getElementById("uniFilter");
+  const tabAll = document.getElementById("tabAll");
+  const tabShortlist = document.getElementById("tabShortlist");
+  const shortlistCountEl = document.getElementById("shortlistCount");
+
+  function badgeClass(signal) {
+    if (signal === "grant-active") return "grant-active";
+    if (signal === "recruiting") return "recruiting";
+    return "unclear";
+  }
+
+  function badgeLabel(signal) {
+    if (signal === "grant-active") return "Grant active";
+    if (signal === "recruiting") return "Recruiting";
+    return "Unclear";
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function render() {
+    const q = searchEl.value.trim().toLowerCase();
+    const funding = fundingEl.value;
+    const uni = uniEl.value;
+
+    let rows = allFaculty;
+    if (view === "shortlist") rows = rows.filter(f => shortlist.has(f.id));
+    if (funding) rows = rows.filter(f => f.funding_signal === funding);
+    if (uni) rows = rows.filter(f => f.university === uni);
+    if (q) {
+      rows = rows.filter(f => {
+        const hay = [
+          f.name, f.university, f.department, f.title,
+          ...(f.research_areas || [])
+        ].join(" ").toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    statusEl.textContent = `${rows.length} faculty shown (of ${allFaculty.length} total)`;
+    emptyEl.style.display = rows.length === 0 ? "block" : "none";
+
+    grid.innerHTML = rows.map(f => {
+      const starred = shortlist.has(f.id);
+      const tags = (f.research_areas || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("");
+      const links = [];
+      if (f.email) links.push(`<a href="mailto:${escapeHtml(f.email)}">Email</a>`);
+      if (f.homepage_url) links.push(`<a href="${escapeHtml(f.homepage_url)}" target="_blank" rel="noopener">Homepage</a>`);
+      if (f.lab_url) links.push(`<a href="${escapeHtml(f.lab_url)}" target="_blank" rel="noopener">Lab</a>`);
+      if (f.source_url) links.push(`<a href="${escapeHtml(f.source_url)}" target="_blank" rel="noopener">Source</a>`);
+
+      return `
+        <div class="card" data-id="${escapeHtml(f.id)}">
+          <button class="star ${starred ? "on" : ""}" title="Add to shortlist">★</button>
+          <h3>${escapeHtml(f.name)}</h3>
+          <div class="uni">${escapeHtml(f.university)}</div>
+          <div class="dept">${escapeHtml(f.department || "")}</div>
+          <div class="title">${escapeHtml(f.title || "")}</div>
+          <span class="badge ${badgeClass(f.funding_signal)}">${badgeLabel(f.funding_signal)}</span>
+          <div class="tags">${tags}</div>
+          <div class="links">${links.join("")}</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  grid.addEventListener("click", (e) => {
+    const btn = e.target.closest(".star");
+    if (!btn) return;
+    const card = btn.closest(".card");
+    const id = card.getAttribute("data-id");
+    if (shortlist.has(id)) shortlist.delete(id); else shortlist.add(id);
+    saveShortlist(shortlist);
+    shortlistCountEl.textContent = shortlist.size;
+    render();
+  });
+
+  searchEl.addEventListener("input", render);
+  fundingEl.addEventListener("change", render);
+  uniEl.addEventListener("change", render);
+
+  tabAll.addEventListener("click", () => {
+    view = "all";
+    tabAll.classList.add("active");
+    tabShortlist.classList.remove("active");
+    render();
+  });
+  tabShortlist.addEventListener("click", () => {
+    view = "shortlist";
+    tabShortlist.classList.add("active");
+    tabAll.classList.remove("active");
+    render();
+  });
+
+  async function load() {
+    shortlistCountEl.textContent = shortlist.size;
+    let page = 0;
+    const pageSize = 1000;
+    let rows = [];
+    while (true) {
+      const { data, error } = await sb
+        .from("faculty")
+        .select("*")
+        .range(page * pageSize, page * pageSize + pageSize - 1)
+        .order("university", { ascending: true });
+      if (error) {
+        statusEl.textContent = "Failed to load faculty data: " + error.message;
+        return;
+      }
+      rows = rows.concat(data);
+      if (data.length < pageSize) break;
+      page++;
+    }
+    allFaculty = rows;
+
+    const unis = [...new Set(rows.map(f => f.university))].sort();
+    uniEl.innerHTML = `<option value="">All universities (${unis.length})</option>` +
+      unis.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join("");
+
+    render();
+  }
+
+  load();
+</script>
+
+</body>
+</html>
