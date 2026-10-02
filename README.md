@@ -1,5 +1,7 @@
 # UNIUS
 
+**Live site:** [https://unius-tan.vercel.app](https://unius-tan.vercel.app)
+
 UNIUS is a searchable directory of CS / Software Engineering / Information Science PhD faculty across 200+ US universities — built to help prospective PhD applicants find funded advisors, labs, and research fits.
 
 ## Stack
