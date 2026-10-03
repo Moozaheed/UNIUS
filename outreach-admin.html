@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UNIUS — Outreach</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e4e2dd;
+    --text: #1d1b16;
+    --text-dim: #6b6862;
+    --accent: #8a3b2e;
+    --accent-weak: #f1e4e0;
+    --ok: #2f6b3a; --ok-bg: #e4f0e3;
+    --fail: #a4342a; --fail-bg: #f7e2df;
+    --pending: #8a6d1f; --pending-bg: #f6efd8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --border: #332f29; --text: #ece8e0; --text-dim: #a19b90;
+      --accent: #e08a6f; --accent-weak: #3a2420;
+      --ok: #8fd19e; --ok-bg: #203323;
+      --fail: #e5897c; --fail-bg: #3a2420;
+      --pending: #e0c468; --pending-bg: #35300f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --border: #332f29; --text: #ece8e0; --text-dim: #a19b90;
+    --accent: #e08a6f; --accent-weak: #3a2420;
+    --ok: #8fd19e; --ok-bg: #203323;
+    --fail: #e5897c; --fail-bg: #3a2420;
+    --pending: #e0c468; --pending-bg: #35300f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 0.3rem; }
+  .sub { color: var(--text-dim); font-size: 0.9rem; margin: 0 0 1.5rem; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.2rem 1.4rem; margin-bottom: 1.2rem;
+  }
+  label { display: block; font-size: 0.82rem; color: var(--text-dim); margin: 0.6rem 0 0.2rem; }
+  input[type=text], input[type=password], input[type=number], input[type=email] {
+    width: 100%; font-family: inherit; font-size: 0.92rem; padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text);
+  }
+  .row { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+  .row > div { flex: 1 1 160px; }
+  button {
+    font-family: inherit; font-size: 0.9rem; padding: 0.55rem 1.1rem; border-radius: 8px;
+    border: 1px solid var(--accent); background: var(--accent-weak); color: var(--accent);
+    cursor: pointer; margin-top: 0.8rem;
+  }
+  button.primary { background: var(--accent); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.ghost { background: transparent; border-color: var(--border); color: var(--text); }
+  .msg { font-size: 0.85rem; margin-top: 0.6rem; }
+  .msg.err { color: var(--fail); }
+  .msg.ok { color: var(--ok); }
+  .checkrow { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
+  .checkrow label { margin: 0; }
+  .daynav {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin-bottom: 1rem;
+  }
+  .daynav .mid { text-align: center; flex: 1; }
+  .daynav h2 { margin: 0; font-size: 1.2rem; }
+  .daynav .date { color: var(--text-dim); font-size: 0.85rem; }
+  .counts { display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.4rem; flex-wrap: wrap; }
+  .badge { font-size: 0.72rem; padding: 0.15rem 0.55rem; border-radius: 999px; font-weight: 600; }
+  .badge.sent { color: var(--ok); background: var(--ok-bg); }
+  .badge.failed { color: var(--fail); background: var(--fail-bg); }
+  .badge.pending { color: var(--pending); background: var(--pending-bg); }
+  .emailrow { border-top: 1px solid var(--border); padding: 0.7rem 0; }
+  .emailrow:first-child { border-top: none; }
+  .emailhead { display: flex; align-items: center; gap: 0.6rem; cursor: pointer; }
+  .emailhead .slot { color: var(--text-dim); font-size: 0.8rem; width: 1.6rem; }
+  .emailhead .who { flex: 1; }
+  .emailhead .who .name { font-weight: 600; font-size: 0.92rem; }
+  .emailhead .who .uni { color: var(--text-dim); font-size: 0.8rem; }
+  .emailtime { color: var(--text-dim); font-size: 0.75rem; }
+  .emailbody { display: none; padding: 0.6rem 0 0.2rem 2.2rem; font-size: 0.88rem; }
+  .emailbody.open { display: block; }
+  .emailbody .subj { font-weight: 600; margin-bottom: 0.4rem; }
+  .emailbody pre { white-space: pre-wrap; font-family: inherit; margin: 0 0 0.5rem; }
+  .emailbody .err { color: var(--fail); font-size: 0.8rem; }
+  #authView { max-width: 380px; margin: 4rem auto; }
+  .toplink { font-size: 0.85rem; }
+  .toplink a { color: var(--accent); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="toplink"><a href="index.html">&larr; Faculty directory</a></p>
+  <h1>Outreach control panel</h1>
+  <p class="sub">Private — only visible once signed in.</p>
+
+  <div id="authView">
+    <div class="card">
+      <h2 style="margin-top:0;">Sign in</h2>
+      <label>Email</label>
+      <input type="email" id="authEmail" autocomplete="username" />
+      <label>Password</label>
+      <input type="password" id="authPassword" autocomplete="current-password" />
+      <button class="primary" id="signInBtn">Sign in</button>
+      <button class="ghost" id="signUpBtn">Create account</button>
+      <div id="authMsg" class="msg"></div>
+    </div>
+  </div>
+
+  <div id="appView" hidden>
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0; font-size:1.05rem;">SMTP &amp; sender settings</h2>
+        <button class="ghost" id="signOutBtn" style="margin:0;">Sign out</button>
+      </div>
+      <div class="row">
+        <div>
+          <label>SMTP host</label>
+          <input type="text" id="smtpHost" placeholder="smtp.gmail.com" />
+        </div>
+        <div>
+          <label>Port</label>
+          <input type="number" id="smtpPort" placeholder="587" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Username</label>
+          <input type="text" id="smtpUser" />
+        </div>
+        <div>
+          <label>Password / app password</label>
+          <input type="password" id="smtpPass" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>From name</label>
+          <input type="text" id="smtpFromName" placeholder="G. M. Mozahad" />
+        </div>
+        <div>
+          <label>From email</label>
+          <input type="email" id="smtpFromEmail" />
+        </div>
+      </div>
+      <div class="checkrow">
+        <input type="checkbox" id="smtpSecure" />
+        <label for="smtpSecure" style="margin:0;">Use SSL (port 465). Leave unchecked for STARTTLS (587).</label>
+      </div>
+      <button class="primary" id="saveSmtpBtn">Save SMTP settings</button>
+      <div id="smtpMsg" class="msg"></div>
+
+      <label style="margin-top:1.4rem;">CV attachment (PDF) — sent with every email</label>
+      <input type="file" id="cvFile" accept="application/pdf" />
+      <button id="uploadCvBtn">Upload / replace CV</button>
+      <span id="cvStatus" class="msg"></span>
+    </div>
+
+    <div class="card">
+      <div class="daynav">
+        <button class="ghost" id="prevDay">&larr; Prev</button>
+        <div class="mid">
+          <h2 id="dayTitle">Day —</h2>
+          <div class="date" id="dayDate"></div>
+          <div class="counts" id="dayCounts"></div>
+        </div>
+        <button class="ghost" id="nextDay">Next &rarr;</button>
+      </div>
+      <div style="text-align:center;">
+        <button class="primary" id="approveBtn" hidden>Approve &amp; start sending today's batch</button>
+        <span id="approveMsg" class="msg"></span>
+      </div>
+      <div id="emailList" style="margin-top:1rem;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+  const SUPABASE_URL = "https://mdgasifbbuwizvqsomwg.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_aCkejAGWx0MWyuCI382Ihg_-sVtEXE1";
+  const FN_URL = SUPABASE_URL + "/functions/v1/send-outreach";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const TOTAL_DAYS = 26;
+  let currentDay = 1;
+  let session = null;
+
+  const el = (id) => document.getElementById(id);
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  async function fnCall(body) {
+    const token = session?.access_token;
+    const res = await fetch(FN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  }
+
+  // ---- auth ----
+  el("signInBtn").addEventListener("click", async () => {
+    const { error } = await sb.auth.signInWithPassword({
+      email: el("authEmail").value.trim(), password: el("authPassword").value,
+    });
+    el("authMsg").textContent = error ? error.message : "";
+    el("authMsg").className = "msg err";
+  });
+  el("signUpBtn").addEventListener("click", async () => {
+    const { error } = await sb.auth.signUp({
+      email: el("authEmail").value.trim(), password: el("authPassword").value,
+    });
+    el("authMsg").className = error ? "msg err" : "msg ok";
+    el("authMsg").textContent = error ? error.message : "Account created — check your email to confirm, then sign in.";
+  });
+  el("signOutBtn").addEventListener("click", async () => {
+    await sb.auth.signOut();
+  });
+
+  sb.auth.onAuthStateChange((_event, s) => {
+    session = s;
+    if (s) {
+      el("authView").hidden = true;
+      el("appView").hidden = false;
+      loadSmtpConfig();
+      pickInitialDay();
+    } else {
+      el("authView").hidden = false;
+      el("appView").hidden = true;
+    }
+  });
+
+  // ---- SMTP settings ----
+  async function loadSmtpConfig() {
+    const { data } = await sb.from("smtp_config").select("*").eq("id", 1).maybeSingle();
+    if (data) {
+      el("smtpHost").value = data.host || "";
+      el("smtpPort").value = data.port || 587;
+      el("smtpUser").value = data.username || "";
+      el("smtpPass").value = data.password || "";
+      el("smtpFromName").value = data.from_name || "";
+      el("smtpFromEmail").value = data.from_email || "";
+      el("smtpSecure").checked = !!data.secure;
+    }
+  }
+  el("saveSmtpBtn").addEventListener("click", async () => {
+    const payload = {
+      id: 1,
+      host: el("smtpHost").value.trim(),
+      port: Number(el("smtpPort").value) || 587,
+      username: el("smtpUser").value.trim(),
+      password: el("smtpPass").value,
+      from_name: el("smtpFromName").value.trim() || "G. M. Mozahad",
+      from_email: el("smtpFromEmail").value.trim(),
+      secure: el("smtpSecure").checked,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await sb.from("smtp_config").upsert(payload);
+    el("smtpMsg").className = error ? "msg err" : "msg ok";
+    el("smtpMsg").textContent = error ? error.message : "Saved.";
+  });
+
+  el("uploadCvBtn").addEventListener("click", async () => {
+    const f = el("cvFile").files[0];
+    if (!f) { el("cvStatus").textContent = "Choose a PDF first."; el("cvStatus").className = "msg err"; return; }
+    const { error } = await sb.storage.from("outreach").upload("cv.pdf", f, { upsert: true, contentType: "application/pdf" });
+    el("cvStatus").className = error ? "msg err" : "msg ok";
+    el("cvStatus").textContent = error ? error.message : "CV uploaded.";
+  });
+
+  // ---- day navigation ----
+  async function pickInitialDay() {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await sb.from("send_days").select("day,send_date").order("day", { ascending: true });
+    if (data && data.length) {
+      let found = data.find(d => d.send_date >= today) || data[data.length - 1];
+      currentDay = found.day;
+    }
+    renderDay();
+  }
+
+  el("prevDay").addEventListener("click", () => { if (currentDay > 1) { currentDay--; renderDay(); } });
+  el("nextDay").addEventListener("click", () => { if (currentDay < TOTAL_DAYS) { currentDay++; renderDay(); } });
+
+  el("approveBtn").addEventListener("click", async () => {
+    el("approveBtn").disabled = true;
+    const res = await fnCall({ mode: "approve", day: currentDay });
+    el("approveMsg").className = res.ok ? "msg ok" : "msg err";
+    el("approveMsg").textContent = res.ok ? "Approved — sending will begin at each slot's scheduled time." : (res.error || "Failed");
+    renderDay();
+  });
+
+  async function renderDay() {
+    el("dayTitle").textContent = `Day ${currentDay} of ${TOTAL_DAYS}`;
+    el("prevDay").disabled = currentDay <= 1;
+    el("nextDay").disabled = currentDay >= TOTAL_DAYS;
+    el("approveMsg").textContent = "";
+
+    const { data: dayRow } = await sb.from("send_days").select("*").eq("day", currentDay).maybeSingle();
+    el("dayDate").textContent = dayRow ? dayRow.send_date : "";
+
+    const { data: rows, error } = await sb
+      .from("outreach_emails")
+      .select("*")
+      .eq("day", currentDay)
+      .order("slot", { ascending: true });
+
+    if (error) {
+      el("emailList").innerHTML = `<div class="msg err">${escapeHtml(error.message)}</div>`;
+      return;
+    }
+
+    const sent = rows.filter(r => r.status === "sent").length;
+    const failed = rows.filter(r => r.status === "failed").length;
+    const pending = rows.filter(r => r.status === "pending").length;
+    el("dayCounts").innerHTML = `
+      <span class="badge sent">${sent} sent</span>
+      <span class="badge failed">${failed} failed</span>
+      <span class="badge pending">${pending} pending</span>
+      <span class="badge" style="color:var(--text-dim); background:var(--accent-weak);">status: ${dayRow ? dayRow.status : "?"}</span>
+    `;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const canApprove = dayRow && dayRow.status === "scheduled" && dayRow.send_date <= today;
+    el("approveBtn").hidden = !canApprove;
+    el("approveBtn").disabled = false;
+
+    el("emailList").innerHTML = rows.map(r => {
+      const t = new Date(r.scheduled_at);
+      const timeStr = t.toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" });
+      return `
+        <div class="emailrow">
+          <div class="emailhead" data-id="${r.id}">
+            <span class="slot">#${r.slot}</span>
+            <span class="who">
+              <div class="name">${escapeHtml(r.name)}</div>
+              <div class="uni">${escapeHtml(r.university)} · ${escapeHtml(r.recipient_email)}</div>
+            </span>
+            <span class="badge ${r.status}">${r.status}</span>
+            <span class="emailtime">${timeStr}</span>
+          </div>
+          <div class="emailbody" id="body-${r.id}">
+            <div class="subj">${escapeHtml(r.subject)}</div>
+            <pre>${escapeHtml(r.body)}</pre>
+            ${r.error ? `<div class="err">Error: ${escapeHtml(r.error)}</div>` : ""}
+            ${r.status !== "sent" ? `<button class="sendNowBtn" data-id="${r.id}">Send now</button>` : ""}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    document.querySelectorAll(".emailhead").forEach(h => {
+      h.addEventListener("click", () => {
+        document.getElementById("body-" + h.dataset.id).classList.toggle("open");
+      });
+    });
+    document.querySelectorAll(".sendNowBtn").forEach(b => {
+      b.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        b.disabled = true;
+        b.textContent = "Sending…";
+        const res = await fnCall({ mode: "send_one", id: Number(b.dataset.id) });
+        renderDay();
+      });
+    });
+  }
+
+  // light polling so sent/failed status updates as the cron sends in the background
+  setInterval(() => { if (session) renderDay(); }, 30000);
+</script>
+
+</body>
+</html>
