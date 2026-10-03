@@ -113,7 +113,18 @@
       <input type="password" id="authPassword" autocomplete="current-password" />
       <button class="primary" id="signInBtn">Sign in</button>
       <button class="ghost" id="signUpBtn">Create account</button>
+      <button class="ghost" id="forgotBtn">Forgot password?</button>
       <div id="authMsg" class="msg"></div>
+    </div>
+  </div>
+
+  <div id="recoverView" hidden style="max-width:380px; margin:4rem auto;">
+    <div class="card">
+      <h2 style="margin-top:0;">Set a new password</h2>
+      <label>New password</label>
+      <input type="password" id="newPassword" autocomplete="new-password" />
+      <button class="primary" id="setNewPasswordBtn">Save new password</button>
+      <div id="recoverMsg" class="msg"></div>
     </div>
   </div>
 
@@ -233,7 +244,30 @@
     await sb.auth.signOut();
   });
 
-  sb.auth.onAuthStateChange((_event, s) => {
+  el("forgotBtn").addEventListener("click", async () => {
+    const email = el("authEmail").value.trim();
+    if (!email) {
+      el("authMsg").className = "msg err";
+      el("authMsg").textContent = "Enter your email above first, then click Forgot password.";
+      return;
+    }
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname,
+    });
+    el("authMsg").className = error ? "msg err" : "msg ok";
+    el("authMsg").textContent = error ? error.message : "Reset email sent — check your inbox and click the link.";
+  });
+
+  let inRecovery = false;
+  sb.auth.onAuthStateChange((event, s) => {
+    if (event === "PASSWORD_RECOVERY") {
+      inRecovery = true;
+      el("authView").hidden = true;
+      el("appView").hidden = true;
+      el("recoverView").hidden = false;
+      return;
+    }
+    if (inRecovery) return; // stay on the recovery form until the new password is saved
     session = s;
     if (s) {
       el("authView").hidden = true;
@@ -244,6 +278,25 @@
       el("authView").hidden = false;
       el("appView").hidden = true;
     }
+  });
+
+  el("setNewPasswordBtn").addEventListener("click", async () => {
+    const pw = el("newPassword").value;
+    if (!pw || pw.length < 6) {
+      el("recoverMsg").className = "msg err";
+      el("recoverMsg").textContent = "Password must be at least 6 characters.";
+      return;
+    }
+    const { error } = await sb.auth.updateUser({ password: pw });
+    if (error) {
+      el("recoverMsg").className = "msg err";
+      el("recoverMsg").textContent = error.message;
+      return;
+    }
+    inRecovery = false;
+    el("recoverMsg").className = "msg ok";
+    el("recoverMsg").textContent = "Password updated — reloading…";
+    setTimeout(() => window.location.href = window.location.origin + window.location.pathname, 1200);
   });
 
   // ---- SMTP settings ----
