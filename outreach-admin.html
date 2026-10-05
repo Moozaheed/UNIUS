@@ -91,6 +91,21 @@
   .emailbody .subj { font-weight: 600; margin-bottom: 0.4rem; }
   .emailbody pre { white-space: pre-wrap; font-family: inherit; margin: 0 0 0.5rem; }
   .emailbody .err { color: var(--fail); font-size: 0.8rem; }
+  .badge.skipped, .badge.manual { color: var(--text-dim); background: var(--accent-weak); }
+  .tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .tabs button { margin: 0; }
+  .tabs button.active { background: var(--accent); color: #fff; }
+  .meta { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.8rem; font-size: 0.82rem; margin-bottom: 0.7rem; }
+  .meta dt { color: var(--text-dim); }
+  .meta dd { margin: 0; overflow-wrap: anywhere; }
+  .meta a { color: var(--accent); }
+  .emailbody textarea, .emailbody input[type=text] {
+    width: 100%; font-family: inherit; font-size: 0.88rem; padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text);
+  }
+  .emailbody textarea { min-height: 16rem; resize: vertical; }
+  .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .actions button { margin-top: 0.5rem; }
   #authView { max-width: 380px; margin: 4rem auto; }
   .toplink { font-size: 0.85rem; }
   .toplink a { color: var(--accent); }
@@ -175,9 +190,19 @@
       <input type="file" id="cvFile" accept="application/pdf" />
       <button id="uploadCvBtn">Upload / replace CV</button>
       <span id="cvStatus" class="msg"></span>
+
+      <label style="margin-top:1.4rem;">SOP / cover letter LaTeX template (.tex) — Claude writes tailored SOPs in this format</label>
+      <input type="file" id="sopFile" accept=".tex,text/x-tex,text/plain" />
+      <button id="uploadSopBtn">Upload / replace SOP template</button>
+      <span id="sopStatus" class="msg"></span>
     </div>
 
-    <div class="card">
+    <div class="tabs">
+      <button class="ghost active" data-tab="profPanel">Professor outreach</button>
+      <button class="ghost" data-tab="phdPanel">PhD leads (LinkedIn)</button>
+    </div>
+
+    <div class="card" id="profPanel">
       <div class="daynav">
         <button class="ghost" id="prevDay">&larr; Prev</button>
         <div class="mid">
@@ -192,6 +217,23 @@
         <span id="approveMsg" class="msg"></span>
       </div>
       <div id="emailList" style="margin-top:1rem;"></div>
+    </div>
+
+    <div class="card" id="phdPanel" hidden>
+      <div class="daynav">
+        <button class="ghost" id="phdPrev">&larr; Prev</button>
+        <div class="mid">
+          <h2 id="phdTitle">PhD leads</h2>
+          <div class="date" id="phdDate"></div>
+          <div class="counts" id="phdCounts"></div>
+        </div>
+        <button class="ghost" id="phdNext">Next &rarr;</button>
+      </div>
+      <div style="text-align:center;">
+        <button class="primary" id="phdApproveBtn" hidden>Approve &amp; start sending this batch</button>
+        <span id="phdApproveMsg" class="msg"></span>
+      </div>
+      <div id="phdList" style="margin-top:1rem;"></div>
     </div>
   </div>
 </div>
@@ -274,6 +316,7 @@
       el("appView").hidden = false;
       loadSmtpConfig();
       pickInitialDay();
+      loadPhdBatches();
     } else {
       el("authView").hidden = false;
       el("appView").hidden = true;
@@ -335,6 +378,16 @@
     const { error } = await sb.storage.from("outreach").upload("cv.pdf", f, { upsert: true, contentType: "application/pdf" });
     el("cvStatus").className = error ? "msg err" : "msg ok";
     el("cvStatus").textContent = error ? error.message : "CV uploaded.";
+  });
+
+  el("uploadSopBtn").addEventListener("click", async () => {
+    const f = el("sopFile").files[0];
+    if (!f) { el("sopStatus").textContent = "Choose a .tex file first."; el("sopStatus").className = "msg err"; return; }
+    const { error } = await sb.from("phd_templates").upsert({
+      name: "sop", content: await f.text(), updated_at: new Date().toISOString(),
+    });
+    el("sopStatus").className = error ? "msg err" : "msg ok";
+    el("sopStatus").textContent = error ? error.message : "SOP template saved.";
   });
 
   // ---- day navigation ----
@@ -434,8 +487,212 @@
     });
   }
 
+  // ---- tabs ----
+  let activeTab = "profPanel";
+  document.querySelectorAll(".tabs button").forEach(b => {
+    b.addEventListener("click", () => {
+      activeTab = b.dataset.tab;
+      document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x === b));
+      el("profPanel").hidden = activeTab !== "profPanel";
+      el("phdPanel").hidden = activeTab !== "phdPanel";
+      if (activeTab === "phdPanel") loadPhdBatches();
+    });
+  });
+
+  // ---- PhD leads (5 per batch date, drafted from LinkedIn posts) ----
+  let phdBatches = [];
+  let phdIdx = 0;
+
+  async function loadPhdBatches() {
+    const { data } = await sb.from("phd_batches").select("*").order("batch_date", { ascending: true });
+    phdBatches = data || [];
+    const today = new Date().toISOString().slice(0, 10);
+    if (phdBatches.length) {
+      const i = phdBatches.findIndex(b => b.batch_date >= today);
+      phdIdx = i >= 0 ? i : phdBatches.length - 1;
+    }
+    renderPhd();
+  }
+
+  el("phdPrev").addEventListener("click", () => { if (phdIdx > 0) { phdIdx--; renderPhd(); } });
+  el("phdNext").addEventListener("click", () => { if (phdIdx < phdBatches.length - 1) { phdIdx++; renderPhd(); } });
+
+  el("phdApproveBtn").addEventListener("click", async () => {
+    el("phdApproveBtn").disabled = true;
+    const batch = phdBatches[phdIdx];
+    const res = await fnCall({ mode: "phd_approve", batch_date: batch.batch_date });
+    el("phdApproveMsg").className = res.ok ? "msg ok" : "msg err";
+    el("phdApproveMsg").textContent = res.ok ? "Approved — each email goes out at its scheduled time." : (res.error || "Failed");
+    if (res.ok) batch.status = "approved";
+    renderPhd();
+  });
+
+  function downloadText(filename, text) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "application/x-tex" }));
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function renderPhd() {
+    el("phdApproveMsg").textContent = "";
+    el("phdPrev").disabled = phdIdx <= 0;
+    el("phdNext").disabled = phdIdx >= phdBatches.length - 1;
+    const batch = phdBatches[phdIdx];
+    if (!batch) {
+      el("phdTitle").textContent = "PhD leads";
+      el("phdDate").textContent = "";
+      el("phdCounts").innerHTML = "";
+      el("phdApproveBtn").hidden = true;
+      el("phdList").innerHTML = `<div class="msg">No batches yet. Send LinkedIn PhD posts to Claude to draft them.</div>`;
+      return;
+    }
+    el("phdTitle").textContent = `Batch ${phdIdx + 1} of ${phdBatches.length}`;
+    el("phdDate").textContent = batch.batch_date;
+
+    const { data: rows, error } = await sb
+      .from("phd_leads")
+      .select("*")
+      .eq("batch_date", batch.batch_date)
+      .order("slot", { ascending: true });
+    if (error) {
+      el("phdList").innerHTML = `<div class="msg err">${escapeHtml(error.message)}</div>`;
+      return;
+    }
+
+    const count = (s) => rows.filter(r => r.status === s).length;
+    el("phdCounts").innerHTML = `
+      <span class="badge sent">${count("sent")} sent</span>
+      <span class="badge failed">${count("failed")} failed</span>
+      <span class="badge pending">${count("pending")} pending</span>
+      ${count("manual") ? `<span class="badge manual">${count("manual")} manual</span>` : ""}
+      <span class="badge" style="color:var(--text-dim); background:var(--accent-weak);">status: ${batch.status}</span>
+    `;
+
+    const today = new Date().toISOString().slice(0, 10);
+    el("phdApproveBtn").hidden = !(batch.status === "scheduled" && batch.batch_date <= today);
+    el("phdApproveBtn").disabled = false;
+
+    const link = (u) => u ? `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a>` : "—";
+    el("phdList").innerHTML = rows.map(r => {
+      const timeStr = r.scheduled_at
+        ? new Date(r.scheduled_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })
+        : "";
+      const editable = r.status !== "sent";
+      const isEmail = r.contact_channel === "email";
+      return `
+        <div class="emailrow">
+          <div class="emailhead" data-id="${r.id}">
+            <span class="slot">#${r.slot ?? ""}</span>
+            <span class="who">
+              <div class="name">${escapeHtml(r.pi_name)}</div>
+              <div class="uni">${escapeHtml(r.university)} · ${escapeHtml(r.recipient_email || r.contact_channel)}</div>
+            </span>
+            <span class="badge ${r.status}">${r.status}</span>
+            <span class="emailtime">${timeStr}</span>
+          </div>
+          <div class="emailbody" id="phdbody-${r.id}">
+            <dl class="meta">
+              <dt>Position</dt><dd>${escapeHtml(r.position_title || "—")}</dd>
+              <dt>Topic</dt><dd>${escapeHtml(r.research_topic || "—")}</dd>
+              <dt>Department</dt><dd>${escapeHtml([r.department, r.country].filter(Boolean).join(" · ") || "—")}</dd>
+              <dt>Funding</dt><dd>${escapeHtml(r.funding || "—")}</dd>
+              <dt>Deadline</dt><dd>${escapeHtml(r.deadline || "—")}</dd>
+              <dt>LinkedIn post</dt><dd>${link(r.source_url)}</dd>
+              <dt>Homepage</dt><dd>${link(r.homepage_url)}</dd>
+              <dt>Attachment</dt><dd>${r.attachment_path
+                ? "CV + " + escapeHtml(r.attachment_path)
+                : r.needs_attachment
+                  ? `<span style="color:var(--fail)">Needs ${escapeHtml(r.needs_attachment)} — won't send until attached</span>`
+                  : "CV only"}</dd>
+              ${r.research_notes ? `<dt>Notes</dt><dd>${escapeHtml(r.research_notes)}</dd>` : ""}
+            </dl>
+            ${editable ? `
+              <label>${isEmail ? "Subject" : "Message"}</label>
+              ${isEmail ? `<input type="text" id="phdsubj-${r.id}" value="${escapeHtml(r.subject)}" />` : ""}
+              <textarea id="phdtext-${r.id}" style="margin-top:0.4rem;">${escapeHtml(r.body)}</textarea>
+            ` : `
+              <div class="subj">${escapeHtml(r.subject)}</div>
+              <pre>${escapeHtml(r.body)}</pre>
+            `}
+            ${r.error ? `<div class="err">Error: ${escapeHtml(r.error)}</div>` : ""}
+            <div class="actions">
+              ${editable ? `<button class="phdSave" data-id="${r.id}">Save edits</button>` : ""}
+              ${editable && isEmail ? `<button class="phdSend" data-id="${r.id}">Send now</button>` : ""}
+              ${!isEmail ? `<button class="phdCopy" data-id="${r.id}">Copy message</button>` : ""}
+              ${!isEmail && r.status === "manual" ? `<button class="phdDone" data-id="${r.id}">Mark as sent</button>` : ""}
+              ${r.sop_tex ? `<button class="ghost phdTex" data-id="${r.id}">Download SOP .tex</button>` : ""}
+              ${editable && isEmail ? `<label style="margin:0.5rem 0 0;">Attach PDF <input type="file" accept="application/pdf" class="phdFile" data-id="${r.id}" /></label>` : ""}
+              ${editable && r.status !== "skipped" ? `<button class="ghost phdSkip" data-id="${r.id}">Skip</button>` : ""}
+            </div>
+            <span class="msg" id="phdmsg-${r.id}"></span>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    const byId = (id) => rows.find(r => r.id === Number(id));
+    const setMsg = (id, ok, text) => {
+      const m = el("phdmsg-" + id);
+      if (m) { m.className = ok ? "msg ok" : "msg err"; m.textContent = text; }
+    };
+
+    document.querySelectorAll("#phdList .emailhead").forEach(h => {
+      h.addEventListener("click", () => el("phdbody-" + h.dataset.id).classList.toggle("open"));
+    });
+    document.querySelectorAll(".phdSave").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.id;
+      const patch = { body: el("phdtext-" + id).value };
+      if (el("phdsubj-" + id)) patch.subject = el("phdsubj-" + id).value;
+      const { error } = await sb.from("phd_leads").update(patch).eq("id", id);
+      if (!error) Object.assign(byId(id), patch);
+      setMsg(id, !error, error ? error.message : "Saved.");
+    }));
+    document.querySelectorAll(".phdSend").forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      b.textContent = "Sending…";
+      const res = await fnCall({ mode: "phd_send_one", id: Number(b.dataset.id) });
+      if (!res.ok) setMsg(b.dataset.id, false, res.error || "Failed");
+      setTimeout(renderPhd, res.ok ? 0 : 1500);
+    }));
+    document.querySelectorAll(".phdCopy").forEach(b => b.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(el("phdtext-" + b.dataset.id)?.value || byId(b.dataset.id).body || "");
+      setMsg(b.dataset.id, true, "Copied.");
+    }));
+    document.querySelectorAll(".phdDone").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("phd_leads").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", b.dataset.id);
+      renderPhd();
+    }));
+    document.querySelectorAll(".phdSkip").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("phd_leads").update({ status: "skipped" }).eq("id", b.dataset.id);
+      renderPhd();
+    }));
+    document.querySelectorAll(".phdTex").forEach(b => b.addEventListener("click", () => {
+      const r = byId(b.dataset.id);
+      const slug = (r.university || "lead").replace(/[^A-Za-z0-9]+/g, "_");
+      downloadText(`G_M_Mozahad_SOP_${slug}.tex`, r.sop_tex);
+    }));
+    document.querySelectorAll(".phdFile").forEach(inp => inp.addEventListener("change", async () => {
+      const f = inp.files[0];
+      if (!f) return;
+      const id = inp.dataset.id;
+      const path = `phd/${id}/${f.name.replace(/[^A-Za-z0-9._-]+/g, "_")}`;
+      const { error } = await sb.storage.from("outreach").upload(path, f, { upsert: true, contentType: "application/pdf" });
+      if (error) { setMsg(id, false, error.message); return; }
+      const { error: e2 } = await sb.from("phd_leads").update({ attachment_path: path }).eq("id", id);
+      setMsg(id, !e2, e2 ? e2.message : "Attached — will be sent with the CV.");
+      if (!e2) byId(id).attachment_path = path;
+    }));
+  }
+
   // light polling so sent/failed status updates as the cron sends in the background
-  setInterval(() => { if (session) renderDay(); }, 30000);
+  setInterval(() => {
+    if (!session) return;
+    if (activeTab === "profPanel") renderDay();
+    // the PhD tab has editable drafts, so only refresh it when nothing is expanded
+    else if (!document.querySelector("#phdList .emailbody.open")) renderPhd();
+  }, 30000);
 </script>
 
 </body>
