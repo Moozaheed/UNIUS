@@ -6,7 +6,11 @@ const fs = require("fs");
 const path = require("path");
 
 const SUPABASE_URL = "https://mdgasifbbuwizvqsomwg.supabase.co";
-const SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZ2FzaWZiYnV3aXp2cXNvbXdnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDk3MDc3OSwiZXhwIjoyMTA2NTQ2Nzc5fQ.g3WicXorhtWGjYJqFrXRdWMfWroTwBzu5_bz3W7AHgY";
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SERVICE_KEY) {
+  console.error("Set SUPABASE_SERVICE_ROLE_KEY in your environment (never commit it).");
+  process.exit(1);
+}
 
 function slugify(text) {
   return text.toString().toLowerCase()
