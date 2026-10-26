@@ -200,6 +200,7 @@
     <div class="tabs">
       <button class="ghost active" data-tab="profPanel">Professor outreach</button>
       <button class="ghost" data-tab="phdPanel">PhD leads (LinkedIn)</button>
+      <button class="ghost" data-tab="mextPanel">MEXT (Japan)</button>
     </div>
 
     <div class="card" id="profPanel">
@@ -234,6 +235,26 @@
         <span id="phdApproveMsg" class="msg"></span>
       </div>
       <div id="phdList" style="margin-top:1rem;"></div>
+    </div>
+
+    <div class="card" id="mextPanel" hidden>
+      <div class="daynav">
+        <button class="ghost" id="mextPrev">&larr; Prev</button>
+        <div class="mid">
+          <h2 id="mextTitle">MEXT (Japan)</h2>
+          <div class="date" id="mextDate"></div>
+          <div class="counts" id="mextCounts"></div>
+        </div>
+        <button class="ghost" id="mextNext">Next &rarr;</button>
+      </div>
+      <div style="text-align:center;">
+        <button class="primary" id="mextApproveBtn" hidden>Approve &amp; start sending this batch</button>
+        <span id="mextApproveMsg" class="msg"></span>
+      </div>
+      <div id="mextList" style="margin-top:1rem;"></div>
+      <h3 style="margin-top:1.5rem;">Professors still needing an email address</h3>
+      <div class="msg">Open the profile link, copy the address, paste it, and press Queue. The draft is added to the next batch with room (5 per day).</div>
+      <div id="mextNoEmail" style="margin-top:0.6rem;"></div>
     </div>
   </div>
 </div>
@@ -495,7 +516,9 @@
       document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x === b));
       el("profPanel").hidden = activeTab !== "profPanel";
       el("phdPanel").hidden = activeTab !== "phdPanel";
+      el("mextPanel").hidden = activeTab !== "mextPanel";
       if (activeTab === "phdPanel") loadPhdBatches();
+      if (activeTab === "mextPanel") loadMextBatches();
     });
   });
 
@@ -686,11 +709,211 @@
     }));
   }
 
+
+  // ---- MEXT (Japan): supervision requests, 5 per batch date ----
+  let mextBatches = [];
+  let mextIdx = 0;
+
+  async function loadMextBatches() {
+    const { data } = await sb.from("mext_send_days").select("*").order("batch_date", { ascending: true });
+    mextBatches = data || [];
+    const today = new Date().toISOString().slice(0, 10);
+    if (mextBatches.length) {
+      const i = mextBatches.findIndex(b => b.batch_date >= today);
+      mextIdx = i >= 0 ? i : mextBatches.length - 1;
+    }
+    renderMext();
+    renderMextNoEmail();
+  }
+
+  el("mextPrev").addEventListener("click", () => { if (mextIdx > 0) { mextIdx--; renderMext(); } });
+  el("mextNext").addEventListener("click", () => { if (mextIdx < mextBatches.length - 1) { mextIdx++; renderMext(); } });
+
+  el("mextApproveBtn").addEventListener("click", async () => {
+    el("mextApproveBtn").disabled = true;
+    const batch = mextBatches[mextIdx];
+    const res = await fnCall({ mode: "mext_approve", batch_date: batch.batch_date });
+    el("mextApproveMsg").className = res.ok ? "msg ok" : "msg err";
+    el("mextApproveMsg").textContent = res.ok ? "Approved — each email goes out at its scheduled time." : (res.error || "Failed");
+    if (res.ok) batch.status = "approved";
+    renderMext();
+  });
+
+  async function renderMext() {
+    el("mextApproveMsg").textContent = "";
+    el("mextPrev").disabled = mextIdx <= 0;
+    el("mextNext").disabled = mextIdx >= mextBatches.length - 1;
+    const batch = mextBatches[mextIdx];
+    if (!batch) {
+      el("mextTitle").textContent = "MEXT (Japan)";
+      el("mextDate").textContent = "";
+      el("mextCounts").innerHTML = "";
+      el("mextApproveBtn").hidden = true;
+      el("mextList").innerHTML = `<div class="msg">No MEXT batches yet.</div>`;
+      return;
+    }
+    el("mextTitle").textContent = `Batch ${mextIdx + 1} of ${mextBatches.length}`;
+    el("mextDate").textContent = batch.batch_date;
+
+    const { data: rows, error } = await sb
+      .from("mext_emails")
+      .select("*")
+      .eq("batch_date", batch.batch_date)
+      .order("slot", { ascending: true });
+    if (error) {
+      el("mextList").innerHTML = `<div class="msg err">${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    const { data: fac } = await sb.from("mext_faculty").select("id,homepage_url,lab_url,research_notes,fit_score");
+    const facById = Object.fromEntries((fac || []).map(f => [f.id, f]));
+
+    const count = (s) => rows.filter(r => r.status === s).length;
+    el("mextCounts").innerHTML = `
+      <span class="badge sent">${count("sent")} sent</span>
+      <span class="badge failed">${count("failed")} failed</span>
+      <span class="badge pending">${count("pending")} pending</span>
+      <span class="badge" style="color:var(--text-dim); background:var(--accent-weak);">status: ${batch.status}</span>
+    `;
+    const today = new Date().toISOString().slice(0, 10);
+    el("mextApproveBtn").hidden = !(batch.status === "scheduled" && batch.batch_date <= today);
+    el("mextApproveBtn").disabled = false;
+
+    const link = (u) => u ? `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${escapeHtml(u)}</a>` : "—";
+    el("mextList").innerHTML = rows.map(r => {
+      const f = facById[r.mext_faculty_id] || {};
+      const timeStr = r.scheduled_at
+        ? new Date(r.scheduled_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })
+        : "";
+      const editable = r.status !== "sent";
+      return `
+        <div class="emailrow">
+          <div class="emailhead" data-id="${r.id}">
+            <span class="slot">#${r.slot ?? ""}</span>
+            <span class="who">
+              <div class="name">${escapeHtml(r.name)}</div>
+              <div class="uni">${escapeHtml(r.university)} · ${escapeHtml(r.recipient_email)}</div>
+            </span>
+            <span class="badge ${r.status}">${r.status}</span>
+            <span class="emailtime">${timeStr}</span>
+          </div>
+          <div class="emailbody" id="mextbody-${r.id}">
+            <dl class="meta">
+              <dt>Fit</dt><dd>${escapeHtml(String(f.fit_score ?? "—"))} / 5</dd>
+              <dt>Profile</dt><dd>${link(f.homepage_url)}</dd>
+              <dt>Lab</dt><dd>${link(f.lab_url)}</dd>
+              ${f.research_notes ? `<dt>Notes</dt><dd>${escapeHtml(f.research_notes)}</dd>` : ""}
+            </dl>
+            ${editable ? `
+              <label>Subject</label>
+              <input type="text" id="mextsubj-${r.id}" value="${escapeHtml(r.subject)}" />
+              <textarea id="mexttext-${r.id}" style="margin-top:0.4rem;">${escapeHtml(r.body)}</textarea>
+            ` : `
+              <div class="subj">${escapeHtml(r.subject)}</div>
+              <pre>${escapeHtml(r.body)}</pre>
+            `}
+            ${r.error ? `<div class="err">Error: ${escapeHtml(r.error)}</div>` : ""}
+            <div class="actions">
+              ${editable ? `<button class="mextSave" data-id="${r.id}">Save edits</button>` : ""}
+              ${editable ? `<button class="mextSend" data-id="${r.id}">Send now</button>` : ""}
+              ${editable && r.status !== "skipped" ? `<button class="ghost mextSkip" data-id="${r.id}">Skip</button>` : ""}
+            </div>
+            <span class="msg" id="mextmsg-${r.id}"></span>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    const byId = (id) => rows.find(r => r.id === Number(id));
+    const setMsg = (id, ok, text) => {
+      const m = el("mextmsg-" + id);
+      if (m) { m.className = ok ? "msg ok" : "msg err"; m.textContent = text; }
+    };
+    document.querySelectorAll("#mextList .emailhead").forEach(h => {
+      h.addEventListener("click", () => el("mextbody-" + h.dataset.id).classList.toggle("open"));
+    });
+    document.querySelectorAll(".mextSave").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.id;
+      const patch = { subject: el("mextsubj-" + id).value, body: el("mexttext-" + id).value };
+      const { error } = await sb.from("mext_emails").update(patch).eq("id", id);
+      if (!error) Object.assign(byId(id), patch);
+      setMsg(id, !error, error ? error.message : "Saved.");
+    }));
+    document.querySelectorAll(".mextSend").forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      b.textContent = "Sending…";
+      const res = await fnCall({ mode: "mext_send_one", id: Number(b.dataset.id) });
+      if (!res.ok) setMsg(b.dataset.id, false, res.error || "Failed");
+      setTimeout(renderMext, res.ok ? 0 : 1500);
+    }));
+    document.querySelectorAll(".mextSkip").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("mext_emails").update({ status: "skipped" }).eq("id", b.dataset.id);
+      renderMext();
+    }));
+  }
+
+  // professors with a drafted email but no address yet: paste the address, then queue
+  async function renderMextNoEmail() {
+    const { data: queued } = await sb.from("mext_emails").select("mext_faculty_id");
+    const done = new Set((queued || []).map(q => q.mext_faculty_id));
+    const { data: profs, error } = await sb
+      .from("mext_faculty")
+      .select("id,name,university,email,homepage_url,lab_url,fit_score,draft_body")
+      .eq("status", "active")
+      .not("draft_body", "is", null)
+      .order("university", { ascending: true });
+    if (error) { el("mextNoEmail").innerHTML = `<div class="msg err">${escapeHtml(error.message)}</div>`; return; }
+    const todo = (profs || []).filter(p => !done.has(p.id));
+    const link = (u) => u ? `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">profile</a>` : "";
+    el("mextNoEmail").innerHTML = todo.length ? todo.map(p => `
+      <div class="emailrow" style="padding:0.5rem 0.8rem; display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+        <span style="flex:1 1 220px;"><b>${escapeHtml(p.name)}</b><br><span class="uni">${escapeHtml(p.university)} · ${link(p.homepage_url)} ${p.lab_url ? "· " + `<a href="${escapeHtml(p.lab_url)}" target="_blank" rel="noopener">lab</a>` : ""}</span></span>
+        <input type="text" id="mextnew-${escapeHtml(p.id)}" value="${escapeHtml(p.email || "")}" placeholder="email@university.ac.jp" style="flex:1 1 220px;" />
+        <button class="mextQueue" data-id="${escapeHtml(p.id)}">Queue</button>
+        <span class="msg" id="mextnewmsg-${escapeHtml(p.id)}"></span>
+      </div>`).join("") : `<div class="msg">Every drafted professor is queued.</div>`;
+
+    document.querySelectorAll(".mextQueue").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.id;
+      const msg = el("mextnewmsg-" + id);
+      const email = el("mextnew-" + id).value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.className = "msg err"; msg.textContent = "Enter a valid email."; return; }
+      b.disabled = true;
+      const p = todo.find(x => x.id === id);
+      const { data: dup } = await sb.from("mext_emails").select("id").ilike("recipient_email", email);
+      if (dup && dup.length) { msg.className = "msg err"; msg.textContent = "Already queued."; b.disabled = false; return; }
+      // first date (today or later) with fewer than 5 emails
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: all } = await sb.from("mext_emails").select("batch_date,slot").gte("batch_date", today);
+      const per = {};
+      (all || []).forEach(r => { per[r.batch_date] = Math.max(per[r.batch_date] || 0, r.slot); });
+      let d = new Date(today + "T00:00:00Z");
+      let day = today;
+      while ((per[day] || 0) >= 5) { d.setUTCDate(d.getUTCDate() + 1); day = d.toISOString().slice(0, 10); }
+      const slot = (per[day] || 0) + 1;
+      // Japan morning: 01:00 UTC, 30 minutes apart
+      const when = new Date(`${day}T01:00:00Z`);
+      when.setUTCMinutes(when.getUTCMinutes() + (slot - 1) * 30);
+      await sb.from("mext_send_days").upsert({ batch_date: day }, { onConflict: "batch_date", ignoreDuplicates: true });
+      await sb.from("mext_faculty").update({ email }).eq("id", id);
+      const { data: f } = await sb.from("mext_faculty").select("draft_subject,draft_body").eq("id", id).single();
+      const { error: e2 } = await sb.from("mext_emails").insert({
+        mext_faculty_id: id, batch_date: day, slot, scheduled_at: when.toISOString(),
+        name: p.name, university: p.university, recipient_email: email,
+        subject: f.draft_subject, body: f.draft_body,
+      });
+      msg.className = e2 ? "msg err" : "msg ok";
+      msg.textContent = e2 ? e2.message : `Queued for ${day}, slot ${slot}.`;
+      if (!e2) { await loadMextBatches(); }
+      else b.disabled = false;
+    }));
+  }
+
   // light polling so sent/failed status updates as the cron sends in the background
   setInterval(() => {
     if (!session) return;
     if (activeTab === "profPanel") renderDay();
     // the PhD tab has editable drafts, so only refresh it when nothing is expanded
+    else if (activeTab === "mextPanel") { if (!document.querySelector("#mextList .emailbody.open")) renderMext(); }
     else if (!document.querySelector("#phdList .emailbody.open")) renderPhd();
   }, 30000);
 </script>
